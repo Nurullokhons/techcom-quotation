@@ -2,7 +2,9 @@ package tj.techcom.quotation
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Settings
@@ -23,12 +26,18 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,27 +49,68 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    HomeScreen()
+                    TechcomApp()
                 }
             }
         }
     }
 }
 
+private enum class AppScreen(val title: String) {
+    HOME("КП-Techcom"),
+    NEW_QUOTATION("Новое КП"),
+    HISTORY("История КП"),
+    CATALOG("Каталог"),
+    SETTINGS("Настройки")
+}
+
 private data class HomeSection(
-    val title: String,
+    val screen: AppScreen,
     val subtitle: String,
     val icon: ImageVector
 )
 
+@Composable
+private fun TechcomApp() {
+    var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
+
+    BackHandler(enabled = currentScreen != AppScreen.HOME) {
+        currentScreen = AppScreen.HOME
+    }
+
+    when (currentScreen) {
+        AppScreen.HOME -> HomeScreen(onOpen = { currentScreen = it })
+        AppScreen.NEW_QUOTATION -> PlaceholderScreen(
+            title = "Новое коммерческое предложение",
+            description = "Здесь появится рабочий экран продавца: поиск моделей, количество, цена и итоговая сумма.",
+            onBack = { currentScreen = AppScreen.HOME }
+        )
+        AppScreen.HISTORY -> PlaceholderScreen(
+            title = "История КП",
+            description = "Здесь будут храниться созданные коммерческие предложения. Можно будет открыть и повторно использовать любое из них.",
+            onBack = { currentScreen = AppScreen.HOME }
+        )
+        AppScreen.CATALOG -> PlaceholderScreen(
+            title = "Каталог оборудования",
+            description = "Здесь появится каталог Techcom с категориями, моделями, фотографиями, описаниями и ценами.",
+            onBack = { currentScreen = AppScreen.HOME }
+        )
+        AppScreen.SETTINGS -> PlaceholderScreen(
+            title = "Настройки",
+            description = "Здесь будут настраиваться валюта, курс валюты и параметры коммерческого предложения.",
+            onBack = { currentScreen = AppScreen.HOME }
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeScreen() {
+private fun HomeScreen(onOpen: (AppScreen) -> Unit) {
     val sections = listOf(
-        HomeSection("Новое КП", "Создать коммерческое предложение", Icons.Default.Add),
-        HomeSection("История КП", "Ранее созданные предложения", Icons.Default.History),
-        HomeSection("Каталог", "Оборудование и цены Techcom", Icons.Default.Inventory2),
-        HomeSection("Настройки", "Валюта и параметры документа", Icons.Default.Settings)
+        HomeSection(AppScreen.NEW_QUOTATION, "Создать коммерческое предложение", Icons.Default.Add),
+        HomeSection(AppScreen.HISTORY, "Ранее созданные предложения", Icons.Default.History),
+        HomeSection(AppScreen.CATALOG, "Оборудование и цены Techcom", Icons.Default.Inventory2),
+        HomeSection(AppScreen.SETTINGS, "Валюта и параметры документа", Icons.Default.Settings)
     )
 
     Scaffold(
@@ -117,7 +167,7 @@ private fun HomeScreen() {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(sections) { section ->
-                    SectionCard(section)
+                    SectionCard(section = section, onClick = { onOpen(section.screen) })
                 }
             }
         }
@@ -125,11 +175,12 @@ private fun HomeScreen() {
 }
 
 @Composable
-private fun SectionCard(section: HomeSection) {
+private fun SectionCard(section: HomeSection, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(142.dp),
+            .height(142.dp)
+            .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
@@ -145,13 +196,47 @@ private fun SectionCard(section: HomeSection) {
                 tint = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Text(section.title, style = MaterialTheme.typography.titleMedium)
+            Text(section.screen.title, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 section.subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaceholderScreen(
+    title: String,
+    description: String,
+    onBack: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(description, style = MaterialTheme.typography.bodyLarge)
+            OutlinedButton(onClick = onBack) {
+                Text("Вернуться на главную")
+            }
         }
     }
 }
