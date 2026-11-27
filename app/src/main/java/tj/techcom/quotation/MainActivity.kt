@@ -81,9 +81,8 @@ private fun TechcomApp() {
 
     when (currentScreen) {
         AppScreen.HOME -> HomeScreen(onOpen = { currentScreen = it })
-        AppScreen.NEW_QUOTATION -> PlaceholderScreen(
-            title = "Новое коммерческое предложение",
-            description = "Здесь появится рабочий экран продавца: поиск моделей, количество, цена и итоговая сумма.",
+        AppScreen.NEW_QUOTATION -> NewQuotationScreen(
+            context = context,
             onBack = { currentScreen = AppScreen.HOME }
         )
         AppScreen.HISTORY -> PlaceholderScreen(
