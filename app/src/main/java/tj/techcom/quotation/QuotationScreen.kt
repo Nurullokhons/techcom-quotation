@@ -173,7 +173,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                         text = {
                             Column {
                                 Text(product.model, fontWeight = FontWeight.SemiBold)
-                                Text("Монтажник: ${product.installerPriceUsd?.let { "$$it" } ?: "цена не указана"}", style = MaterialTheme.typography.bodySmall)
+                                Text("Монтажник: ${product.installerPriceUsd?.let { "\$it" } ?: "цена не указана"}", style = MaterialTheme.typography.bodySmall)
                             }
                         },
                         onClick = { addProduct(product) }
@@ -237,7 +237,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                                         Icon(Icons.Default.Add, contentDescription = "Увеличить")
                                     }
                                     Spacer(modifier = Modifier.weight(1f))
-                                    Text("Сумма: $${((line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO) * BigDecimal(line.quantity)).setScale(2, RoundingMode.HALF_UP)}")
+                                    Text("Сумма: \${((line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO) * BigDecimal(line.quantity)).setScale(2, RoundingMode.HALF_UP)}")
                                 }
                                 OutlinedTextField(
                                     value = line.price,
