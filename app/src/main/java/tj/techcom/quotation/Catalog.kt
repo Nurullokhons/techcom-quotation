@@ -64,7 +64,7 @@ private data class CatalogLoadResult(
     val error: String? = null
 )
 
-private suspend fun loadCatalog(context: Context): CatalogLoadResult = withContext(Dispatchers.IO) {
+internal suspend fun loadCatalog(context: Context): CatalogLoadResult = withContext(Dispatchers.IO) {
     try {
         val imageDirectory = File(context.filesDir, "catalog-images")
         if (!imageDirectory.exists()) imageDirectory.mkdirs()
