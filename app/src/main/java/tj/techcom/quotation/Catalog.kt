@@ -59,7 +59,7 @@ internal data class CatalogProduct(
     val imageFile: File?
 )
 
-private data class CatalogLoadResult(
+internal data class CatalogLoadResult(
     val products: List<CatalogProduct>,
     val error: String? = null
 )
