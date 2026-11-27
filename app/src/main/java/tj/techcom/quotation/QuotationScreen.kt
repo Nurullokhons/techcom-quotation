@@ -18,10 +18,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -136,10 +134,6 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { /* PDF and save will be added in the next stage */ }, modifier = Modifier.fillMaxWidth(), enabled = lines.isNotEmpty()) {
-                        Text("Продолжить")
                     }
                 }
             }
