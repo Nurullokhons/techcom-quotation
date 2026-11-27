@@ -26,7 +26,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -42,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,6 +73,7 @@ private data class HomeSection(
 @Composable
 private fun TechcomApp() {
     var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
+    val context = LocalContext.current
 
     BackHandler(enabled = currentScreen != AppScreen.HOME) {
         currentScreen = AppScreen.HOME
@@ -90,9 +91,8 @@ private fun TechcomApp() {
             description = "Здесь будут храниться созданные коммерческие предложения. Можно будет открыть и повторно использовать любое из них.",
             onBack = { currentScreen = AppScreen.HOME }
         )
-        AppScreen.CATALOG -> PlaceholderScreen(
-            title = "Каталог оборудования",
-            description = "Здесь появится каталог Techcom с категориями, моделями, фотографиями, описаниями и ценами.",
+        AppScreen.CATALOG -> CatalogScreen(
+            context = context,
             onBack = { currentScreen = AppScreen.HOME }
         )
         AppScreen.SETTINGS -> PlaceholderScreen(
@@ -219,7 +219,7 @@ private fun PlaceholderScreen(
             TopAppBar(
                 title = { Text(title) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    androidx.compose.material3.IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
                     }
                 }
