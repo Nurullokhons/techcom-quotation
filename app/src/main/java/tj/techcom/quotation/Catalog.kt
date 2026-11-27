@@ -93,8 +93,7 @@ private suspend fun loadCatalog(context: Context): CatalogLoadResult = withConte
         for (i in 0 until array.length()) {
             val item = array.getJSONObject(i)
             val imageName = item.optString("image").takeIf { it.isNotBlank() && it != "null" }
-            val imageFile = imageName?.let { File(imageDirectory, it.removePrefix("images/")) }
-                ?.takeIf { it.exists() }
+            val imageFile = imageName?.let { File(imageDirectory, it) }?.takeIf { it.exists() }
 
             products += CatalogProduct(
                 id = item.optString("id"),
@@ -281,4 +280,4 @@ private fun CatalogProductCard(product: CatalogProduct, onClick: () -> Unit) {
 }
 
 private fun formatUsd(value: String?): String =
-    value?.toBigDecimalOrNull()?.stripTrailingZeros()?.toPlainString()?.let { "$$it" } ?: "не указана"
+    value?.toBigDecimalOrNull()?.stripTrailingZeros()?.toPlainString()?.let { "\$$it" } ?: "не указана"
