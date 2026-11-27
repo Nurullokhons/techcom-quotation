@@ -2,6 +2,7 @@ package tj.techcom.quotation
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -143,41 +144,43 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            OutlinedTextField(
-                value = search,
-                onValueChange = { search = it; menuExpanded = it.isNotBlank() },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Найти модель или название") },
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(onClick = { showNewModelDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Новая модель")
-                    }
-                }
-            )
-            DropdownMenu(
-                expanded = menuExpanded && search.isNotBlank(),
-                onDismissRequest = { menuExpanded = false },
-                modifier = Modifier.fillMaxWidth(0.92f)
-            ) {
-                DropdownMenuItem(
-                    text = { Text("+ Новая модель", fontWeight = FontWeight.SemiBold) },
-                    onClick = {
-                        newModelName = search
-                        showNewModelDialog = true
-                        menuExpanded = false
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it; menuExpanded = it.isNotBlank() },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Найти модель или название") },
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showNewModelDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "Новая модель")
+                        }
                     }
                 )
-                matches.forEach { product ->
+                DropdownMenu(
+                    expanded = menuExpanded && search.isNotBlank(),
+                    onDismissRequest = { menuExpanded = false },
+                    modifier = Modifier.fillMaxWidth(0.92f)
+                ) {
                     DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(product.model, fontWeight = FontWeight.SemiBold)
-                                Text("Монтажник: ${product.installerPriceUsd?.let { "\$it" } ?: "цена не указана"}", style = MaterialTheme.typography.bodySmall)
-                            }
-                        },
-                        onClick = { addProduct(product) }
+                        text = { Text("+ Новая модель", fontWeight = FontWeight.SemiBold) },
+                        onClick = {
+                            newModelName = search
+                            showNewModelDialog = true
+                            menuExpanded = false
+                        }
                     )
+                    matches.forEach { product ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(product.model, fontWeight = FontWeight.SemiBold)
+                                    Text("Монтажник: " + (product.installerPriceUsd?.let { "$" + it } ?: "цена не указана"), style = MaterialTheme.typography.bodySmall)
+                                }
+                            },
+                            onClick = { addProduct(product) }
+                        )
+                    }
                 }
             }
 
@@ -237,7 +240,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                                         Icon(Icons.Default.Add, contentDescription = "Увеличить")
                                     }
                                     Spacer(modifier = Modifier.weight(1f))
-                                    Text("Сумма: \${((line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO) * BigDecimal(line.quantity)).setScale(2, RoundingMode.HALF_UP)}")
+                                    Text("Сумма: $" + ((line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO) * BigDecimal(line.quantity)).setScale(2, RoundingMode.HALF_UP).toPlainString())
                                 }
                                 OutlinedTextField(
                                     value = line.price,
