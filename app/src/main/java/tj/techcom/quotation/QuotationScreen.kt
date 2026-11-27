@@ -2,13 +2,12 @@ package tj.techcom.quotation
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,8 +20,6 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -82,10 +81,18 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         loading = false
     }
 
-    val matches = products.filter {
-        search.isNotBlank() &&
-            (it.model.contains(search.trim(), ignoreCase = true) ||
-             it.description.contains(search.trim(), ignoreCase = true))
+    val normalizedSearch = search.trim().lowercase().replace('ё', 'е')
+    val matches = products.filter { product ->
+        if (normalizedSearch.isBlank()) false
+        else listOf(
+            product.model,
+            product.description,
+            product.category,
+            product.subcategory,
+            product.subsubcategory
+        ).any { field ->
+            field.lowercase().replace('ё', 'е').contains(normalizedSearch)
+        }
     }.take(12)
 
     fun addProduct(product: CatalogProduct) {
@@ -144,42 +151,54 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it; menuExpanded = it.isNotBlank() },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Найти модель или название") },
-                    singleLine = true,
-                    trailingIcon = {
-                        IconButton(onClick = { showNewModelDialog = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "Новая модель")
-                        }
+            OutlinedTextField(
+                value = search,
+                onValueChange = { search = it; menuExpanded = it.isNotBlank() },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Найти модель или название") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Search
+                ),
+                trailingIcon = {
+                    IconButton(onClick = { showNewModelDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Новая модель")
                     }
-                )
-                DropdownMenu(
-                    expanded = menuExpanded && search.isNotBlank(),
-                    onDismissRequest = { menuExpanded = false },
-                    modifier = Modifier.fillMaxWidth(0.92f)
+                }
+            )
+            if (menuExpanded && search.isNotBlank()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("+ Новая модель", fontWeight = FontWeight.SemiBold) },
-                        onClick = {
-                            newModelName = search
-                            showNewModelDialog = true
-                            menuExpanded = false
+                    LazyColumn {
+                        item {
+                            androidx.compose.material3.TextButton(
+                                onClick = {
+                                    newModelName = search
+                                    showNewModelDialog = true
+                                    menuExpanded = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("+ Новая модель") }
                         }
-                    )
-                    matches.forEach { product ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(product.model, fontWeight = FontWeight.SemiBold)
-                                    Text("Монтажник: " + (product.installerPriceUsd?.let { "$" + it } ?: "цена не указана"), style = MaterialTheme.typography.bodySmall)
+                        if (matches.isEmpty()) {
+                            item { Text("Совпадений не найдено", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        } else {
+                            items(matches, key = { it.id }) { product ->
+                                androidx.compose.material3.TextButton(
+                                    onClick = { addProduct(product) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Text(product.model, fontWeight = FontWeight.SemiBold)
+                                        Text("Монтажник: " + (product.installerPriceUsd?.let { "$" + it } ?: "цена не указана"), style = MaterialTheme.typography.bodySmall)
+                                    }
                                 }
-                            },
-                            onClick = { addProduct(product) }
-                        )
+                            }
+                        }
                     }
                 }
             }
