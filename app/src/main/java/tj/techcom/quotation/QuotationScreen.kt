@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,6 +23,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,7 +34,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +50,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -54,10 +61,28 @@ private data class QuotationLine(
     val model: String,
     val unit: String,
     val description: String,
-    val imageFile: java.io.File?,
+    val imageFile: File?,
     val quantity: Int,
+    // All line prices are stored internally in USD.
     val price: String
 )
+
+private fun displayPrice(usdPrice: String, currency: String, rate: String): String {
+    val amount = usdPrice.toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val converted = if (currency == "TJS") {
+        amount.multiply(rate.toBigDecimalOrNull() ?: BigDecimal.ZERO)
+    } else amount
+    return converted.setScale(2, RoundingMode.HALF_UP).toPlainString()
+}
+
+private fun enteredPriceToUsd(value: String, currency: String, rate: String): String {
+    val amount = value.replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO
+    val usd = if (currency == "TJS") {
+        val exchangeRate = rate.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        if (exchangeRate.compareTo(BigDecimal.ZERO) > 0) amount.divide(exchangeRate, 6, RoundingMode.HALF_UP) else BigDecimal.ZERO
+    } else amount
+    return usd.stripTrailingZeros().toPlainString().ifBlank { "0" }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,9 +93,18 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
     var search by remember { mutableStateOf("") }
     var menuExpanded by remember { mutableStateOf(false) }
     var showNewModelDialog by remember { mutableStateOf(false) }
+    var showDetailsDialog by remember { mutableStateOf(false) }
     var newModelName by remember { mutableStateOf("") }
     var newModelUnit by remember { mutableStateOf("шт.") }
     var newModelPrice by remember { mutableStateOf("") }
+    var clientOrganization by remember { mutableStateOf("") }
+    var clientContact by remember { mutableStateOf("") }
+    var clientPhone by remember { mutableStateOf("") }
+    var clientAddress by remember { mutableStateOf("") }
+    var currency by remember { mutableStateOf("USD") }
+    var exchangeRate by remember { mutableStateOf("") }
+    var taxIncluded by remember { mutableStateOf(false) }
+    var draftRestored by remember { mutableStateOf(false) }
     val lines = remember { mutableStateListOf<QuotationLine>() }
     val focusManager = LocalFocusManager.current
 
@@ -78,21 +112,74 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         val result = loadCatalog(context)
         products = result.products
         loadError = result.error
+
+        val saved = context.getSharedPreferences("quotation_draft", Context.MODE_PRIVATE)
+            .getString("draft", null)
+        if (!saved.isNullOrBlank()) {
+            runCatching {
+                val root = JSONObject(saved)
+                clientOrganization = root.optString("clientOrganization")
+                clientContact = root.optString("clientContact")
+                clientPhone = root.optString("clientPhone")
+                clientAddress = root.optString("clientAddress")
+                currency = root.optString("currency", "USD").takeIf { it == "TJS" } ?: "USD"
+                exchangeRate = root.optString("exchangeRate")
+                taxIncluded = root.optBoolean("taxIncluded", false)
+                val savedLines = root.optJSONArray("lines") ?: JSONArray()
+                for (i in 0 until savedLines.length()) {
+                    val item = savedLines.getJSONObject(i)
+                    val id = item.optString("id")
+                    val product = products.firstOrNull { it.id == id }
+                    lines.add(
+                        QuotationLine(
+                            id = id,
+                            model = item.optString("model"),
+                            unit = item.optString("unit", "шт."),
+                            description = item.optString("description"),
+                            imageFile = product?.imageFile,
+                            quantity = item.optInt("quantity", 1).coerceAtLeast(1),
+                            price = item.optString("price")
+                        )
+                    )
+                }
+            }
+        }
         loading = false
+        draftRestored = true
+    }
+
+    LaunchedEffect(lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, exchangeRate, taxIncluded, draftRestored) {
+        if (draftRestored) {
+            val root = JSONObject()
+            root.put("clientOrganization", clientOrganization)
+            root.put("clientContact", clientContact)
+            root.put("clientPhone", clientPhone)
+            root.put("clientAddress", clientAddress)
+            root.put("currency", currency)
+            root.put("exchangeRate", exchangeRate)
+            root.put("taxIncluded", taxIncluded)
+            val savedLines = JSONArray()
+            lines.forEach { line ->
+                savedLines.put(JSONObject().apply {
+                    put("id", line.id)
+                    put("model", line.model)
+                    put("unit", line.unit)
+                    put("description", line.description)
+                    put("quantity", line.quantity)
+                    put("price", line.price)
+                })
+            }
+            root.put("lines", savedLines)
+            context.getSharedPreferences("quotation_draft", Context.MODE_PRIVATE)
+                .edit().putString("draft", root.toString()).apply()
+        }
     }
 
     val normalizedSearch = search.trim().lowercase().replace('ё', 'е')
     val matches = products.filter { product ->
         if (normalizedSearch.isBlank()) false
-        else listOf(
-            product.model,
-            product.description,
-            product.category,
-            product.subcategory,
-            product.subsubcategory
-        ).any { field ->
-            field.lowercase().replace('ё', 'е').contains(normalizedSearch)
-        }
+        else listOf(product.model, product.description, product.category, product.subcategory, product.subsubcategory)
+            .any { it.lowercase().replace('ё', 'е').contains(normalizedSearch) }
     }.take(12)
 
     fun addProduct(product: CatalogProduct) {
@@ -117,16 +204,23 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         focusManager.clearFocus()
     }
 
-    val total = lines.fold(BigDecimal.ZERO) { sum, line ->
+    val totalUsd = lines.fold(BigDecimal.ZERO) { sum, line ->
         val price = line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO
         sum + price.multiply(BigDecimal(line.quantity))
     }
+    val totalDisplay = if (currency == "TJS") {
+        totalUsd.multiply(exchangeRate.toBigDecimalOrNull() ?: BigDecimal.ZERO)
+    } else totalUsd
+    val currencyLabel = if (currency == "TJS") "TJS" else "USD"
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Новое КП") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } }
+                navigationIcon = { TextButton(onClick = onBack) { Text("Назад") } },
+                actions = {
+                    TextButton(onClick = { showDetailsDialog = true }) { Text("Клиент и валюта") }
+                }
             )
         },
         bottomBar = {
@@ -138,7 +232,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Позиций: ${lines.size}", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Итого: $${total.setScale(2, RoundingMode.HALF_UP).toPlainString()}",
+                            "Итого: ${totalDisplay.setScale(2, RoundingMode.HALF_UP).toPlainString()} $currencyLabel",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -148,7 +242,8 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 14.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 14.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             OutlinedTextField(
@@ -178,6 +273,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                             androidx.compose.material3.TextButton(
                                 onClick = {
                                     newModelName = search
+                                    newModelPrice = ""
                                     showNewModelDialog = true
                                     menuExpanded = false
                                 },
@@ -194,7 +290,10 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                                 ) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         Text(product.model, fontWeight = FontWeight.SemiBold)
-                                        Text("Монтажник: " + (product.installerPriceUsd?.let { "$" + it } ?: "цена не указана"), style = MaterialTheme.typography.bodySmall)
+                                        Text(
+                                            "Монтажник: " + (product.installerPriceUsd?.let { displayPrice(it, currency, exchangeRate) + " " + currencyLabel } ?: "цена не указана"),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
                                     }
                                 }
                             }
@@ -204,10 +303,10 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
             }
 
             if (loading) {
-                Column(modifier = Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.Center) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     CircularProgressIndicator()
-                    Text("Загружаем каталог…")
                 }
+                Text("Загружаем каталог…")
             } else if (loadError != null) {
                 Text("Не удалось загрузить каталог: $loadError")
             } else if (lines.isEmpty()) {
@@ -218,65 +317,106 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
-                Spacer(modifier = Modifier.weight(1f))
             } else {
                 Text("Оборудование в предложении", style = MaterialTheme.typography.titleMedium)
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(lines, key = { it.id }) { line ->
-                        val index = lines.indexOfFirst { it.id == line.id }
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(line.model, fontWeight = FontWeight.SemiBold)
-                                        if (line.unit.isNotBlank()) Text("Ед. изм.: ${line.unit}", style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    IconButton(onClick = { lines.remove(line) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Удалить")
-                                    }
+                lines.toList().forEach { line ->
+                    val index = lines.indexOfFirst { it.id == line.id }
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(line.model, fontWeight = FontWeight.SemiBold)
+                                    if (line.unit.isNotBlank()) Text("Ед. изм.: ${line.unit}", style = MaterialTheme.typography.bodySmall)
                                 }
-                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                    Text("Кол-во", style = MaterialTheme.typography.labelMedium)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    IconButton(onClick = { if (line.quantity > 1) lines[index] = line.copy(quantity = line.quantity - 1) }) {
-                                        Icon(Icons.Default.Remove, contentDescription = "Уменьшить")
-                                    }
-                                    OutlinedTextField(
-                                        value = line.quantity.toString(),
-                                        onValueChange = { value ->
-                                            val qty = value.toIntOrNull()
-                                            if (qty != null && qty > 0 && qty < 100000) lines[index] = line.copy(quantity = qty)
-                                            if (value.isEmpty()) lines[index] = line.copy(quantity = 1)
-                                        },
-                                        modifier = Modifier.width(82.dp),
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                                    )
-                                    IconButton(onClick = { lines[index] = line.copy(quantity = line.quantity + 1) }) {
-                                        Icon(Icons.Default.Add, contentDescription = "Увеличить")
-                                    }
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Text("Сумма: $" + ((line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO) * BigDecimal(line.quantity)).setScale(2, RoundingMode.HALF_UP).toPlainString())
+                                IconButton(onClick = { lines.remove(line) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Удалить")
+                                }
+                            }
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Text("Кол-во", style = MaterialTheme.typography.labelMedium)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(onClick = { if (line.quantity > 1) lines[index] = line.copy(quantity = line.quantity - 1) }) {
+                                    Icon(Icons.Default.Remove, contentDescription = "Уменьшить")
                                 }
                                 OutlinedTextField(
-                                    value = line.price,
+                                    value = line.quantity.toString(),
                                     onValueChange = { value ->
-                                        if (value.matches(Regex("^\\d{0,9}([.,]\\d{0,4})?$"))) lines[index] = line.copy(price = value.replace(',', '.'))
+                                        val qty = value.toIntOrNull()
+                                        if (qty != null && qty > 0 && qty < 100000) lines[index] = line.copy(quantity = qty)
+                                        if (value.isEmpty()) lines[index] = line.copy(quantity = 1)
                                     },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    label = { Text("Цена за единицу, USD") },
+                                    modifier = Modifier.width(82.dp),
                                     singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                 )
+                                IconButton(onClick = { lines[index] = line.copy(quantity = line.quantity + 1) }) {
+                                    Icon(Icons.Default.Add, contentDescription = "Увеличить")
+                                }
                             }
+                            Text(
+                                "Сумма: ${displayPrice((line.price.toBigDecimalOrNull()?.multiply(BigDecimal(line.quantity)) ?: BigDecimal.ZERO).toPlainString(), currency, exchangeRate)} $currencyLabel",
+                                fontWeight = FontWeight.Medium
+                            )
+                            OutlinedTextField(
+                                value = displayPrice(line.price, currency, exchangeRate),
+                                onValueChange = { value ->
+                                    if (value.matches(Regex("^\\d{0,12}([.,]\\d{0,4})?$"))) {
+                                        lines[index] = line.copy(price = enteredPriceToUsd(value, currency, exchangeRate))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Цена за единицу, $currencyLabel") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                            )
                         }
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(12.dp))
         }
+    }
+
+    if (showDetailsDialog) {
+        AlertDialog(
+            onDismissRequest = { showDetailsDialog = false },
+            title = { Text("Данные клиента и параметры КП") },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(clientOrganization, { clientOrganization = it }, label = { Text("Название организации") }, singleLine = true)
+                    OutlinedTextField(clientContact, { clientContact = it }, label = { Text("Контактное лицо") }, singleLine = true)
+                    OutlinedTextField(clientPhone, { clientPhone = it }, label = { Text("Телефон") }, singleLine = true)
+                    OutlinedTextField(clientAddress, { clientAddress = it }, label = { Text("Адрес") }, singleLine = true)
+                    Text("Валюта коммерческого предложения", fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { currency = "USD" }) { Text(if (currency == "USD") "✓ USD" else "USD") }
+                        TextButton(onClick = { currency = "TJS" }) { Text(if (currency == "TJS") "✓ TJS" else "TJS") }
+                    }
+                    if (currency == "TJS") {
+                        OutlinedTextField(
+                            value = exchangeRate,
+                            onValueChange = { if (it.matches(Regex("^\\d{0,9}([.,]\\d{0,6})?$"))) exchangeRate = it.replace(',', '.') },
+                            label = { Text("Курс: 1 USD = ? TJS") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                        )
+                    }
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Checkbox(checked = taxIncluded, onCheckedChange = { taxIncluded = it })
+                        Text(if (taxIncluded) "Цены указаны с учётом налогов" else "Цены указаны без учёта налогов")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showDetailsDialog = false },
+                    enabled = currency == "USD" || (exchangeRate.toBigDecimalOrNull()?.compareTo(BigDecimal.ZERO) ?: -1) > 0
+                ) { Text("Готово") }
+            }
+        )
     }
 
     if (showNewModelDialog) {
@@ -289,8 +429,8 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                     OutlinedTextField(value = newModelUnit, onValueChange = { newModelUnit = it }, label = { Text("Единица измерения") }, singleLine = true)
                     OutlinedTextField(
                         value = newModelPrice,
-                        onValueChange = { if (it.matches(Regex("^\\d{0,9}([.,]\\d{0,4})?$"))) newModelPrice = it.replace(',', '.') },
-                        label = { Text("Цена, USD") },
+                        onValueChange = { if (it.matches(Regex("^\\d{0,12}([.,]\\d{0,4})?$"))) newModelPrice = it.replace(',', '.') },
+                        label = { Text("Цена, $currencyLabel") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true
                     )
@@ -298,10 +438,11 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
             },
             confirmButton = {
                 TextButton(
-                    enabled = newModelName.isNotBlank(),
+                    enabled = newModelName.isNotBlank() && (newModelPrice.isBlank() || currency == "USD" || (exchangeRate.toBigDecimalOrNull()?.compareTo(BigDecimal.ZERO) ?: -1) > 0),
                     onClick = {
                         val id = "manual-${System.currentTimeMillis()}"
-                        lines.add(QuotationLine(id, newModelName.trim(), newModelUnit.trim().ifBlank { "шт." }, "", null, 1, newModelPrice))
+                        val priceUsd = if (newModelPrice.isBlank()) "" else enteredPriceToUsd(newModelPrice, currency, exchangeRate)
+                        lines.add(QuotationLine(id, newModelName.trim(), newModelUnit.trim().ifBlank { "шт." }, "", null, 1, priceUsd))
                         showNewModelDialog = false
                         newModelName = ""
                         newModelUnit = "шт."
