@@ -88,7 +88,7 @@ private fun enteredPriceToUsd(value: String, currency: String, rate: String): St
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
+internal fun NewQuotationScreen(context: Context, initialQuotationJson: String? = null, onBack: () -> Unit) {
     var products by remember { mutableStateOf<List<CatalogProduct>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
@@ -111,6 +111,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
     var showHeader by remember { mutableStateOf(true) }
     var pdfMessage by remember { mutableStateOf<String?>(null) }
     var draftRestored by remember { mutableStateOf(false) }
+    var quoteId by remember { mutableStateOf("") }
     val lines = remember { mutableStateListOf<QuotationLine>() }
     val focusManager = LocalFocusManager.current
 
@@ -119,11 +120,12 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         products = result.products
         loadError = result.error
 
-        val saved = context.getSharedPreferences("quotation_draft", Context.MODE_PRIVATE)
+        val saved = initialQuotationJson ?: context.getSharedPreferences("quotation_draft", Context.MODE_PRIVATE)
             .getString("draft", null)
         if (!saved.isNullOrBlank()) {
             runCatching {
                 val root = JSONObject(saved)
+                quoteId = root.optString("quoteId")
                 clientOrganization = root.optString("clientOrganization")
                 clientContact = root.optString("clientContact")
                 clientPhone = root.optString("clientPhone")
@@ -156,9 +158,10 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         draftRestored = true
     }
 
-    LaunchedEffect(lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, priceType, exchangeRate, taxIncluded, showHeader, draftRestored) {
+    LaunchedEffect(lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, priceType, exchangeRate, taxIncluded, showHeader, quoteId, draftRestored) {
         if (draftRestored) {
             val root = JSONObject()
+            root.put("quoteId", quoteId)
             root.put("clientOrganization", clientOrganization)
             root.put("clientContact", clientContact)
             root.put("clientPhone", clientPhone)
@@ -240,6 +243,33 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
     } else totalUsd
     val currencyLabel = if (currency == "TJS") "TJS" else "USD"
 
+    fun serializeQuotation(): String {
+        val root = JSONObject()
+        root.put("quoteId", quoteId)
+        root.put("clientOrganization", clientOrganization)
+        root.put("clientContact", clientContact)
+        root.put("clientPhone", clientPhone)
+        root.put("clientAddress", clientAddress)
+        root.put("currency", currency)
+        root.put("priceType", priceType)
+        root.put("exchangeRate", exchangeRate)
+        root.put("taxIncluded", taxIncluded)
+        root.put("showHeader", showHeader)
+        val savedLines = JSONArray()
+        lines.forEach { line ->
+            savedLines.put(JSONObject().apply {
+                put("id", line.id)
+                put("model", line.model)
+                put("unit", line.unit)
+                put("description", line.description)
+                put("quantity", line.quantity)
+                put("price", line.price)
+            })
+        }
+        root.put("lines", savedLines)
+        return root.toString()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -264,17 +294,31 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    androidx.compose.material3.Button(
-                        onClick = {
-                            if (lines.isEmpty()) pdfMessage = "Добавьте хотя бы одну позицию."
-                            else if (currency == "TJS" && (exchangeRate.toBigDecimalOrNull()?.compareTo(BigDecimal.ZERO) ?: -1) <= 0) pdfMessage = "Укажите корректный курс валюты."
-                            else runCatching {
-                                val pdf = createQuotationPdf(context, lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, exchangeRate, taxIncluded, showHeader)
-                                previewQuotationPdf(context, pdf)
-                            }.onFailure { pdfMessage = "Не удалось создать PDF: " + it.message }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Сохранить и просмотреть PDF") }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            onClick = {
+                                runCatching {
+                                    val saved = saveQuotationToHistory(context, serializeQuotation())
+                                    quoteId = JSONObject(saved).optString("quoteId")
+                                    pdfMessage = "КП сохранено в истории. Его можно открыть и продолжить позже."
+                                }.onFailure { pdfMessage = "Не удалось сохранить КП: " + it.message }
+                            },
+                            modifier = Modifier.weight(0.8f)
+                        ) { Text("Сохранить КП") }
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                if (lines.isEmpty()) pdfMessage = "Добавьте хотя бы одну позицию."
+                                else if (currency == "TJS" && (exchangeRate.toBigDecimalOrNull()?.compareTo(BigDecimal.ZERO) ?: -1) <= 0) pdfMessage = "Укажите корректный курс валюты."
+                                else runCatching {
+                                    val saved = saveQuotationToHistory(context, serializeQuotation())
+                                    quoteId = JSONObject(saved).optString("quoteId")
+                                    val pdf = createQuotationPdf(context, lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, exchangeRate, taxIncluded, showHeader)
+                                    previewQuotationPdf(context, pdf)
+                                }.onFailure { pdfMessage = "Не удалось создать PDF: " + it.message }
+                            },
+                            modifier = Modifier.weight(1.2f)
+                        ) { Text("Сохранить и просмотреть PDF") }
+                    }
                 }
             }
         }
