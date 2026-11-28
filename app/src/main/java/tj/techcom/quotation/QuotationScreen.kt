@@ -411,7 +411,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         }
     }
 
-    if (pdfMessage != null) {\n        AlertDialog(onDismissRequest = { pdfMessage = null }, title = { Text("Коммерческое предложение") }, text = { Text(pdfMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { pdfMessage = null }) { Text("OK") } })\n    }\n\n    if (pdfMessage != null) {
+    if (pdfMessage != null) {
         AlertDialog(onDismissRequest = { pdfMessage = null }, title = { Text("Коммерческое предложение") }, text = { Text(pdfMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { pdfMessage = null }) { Text("OK") } })
     }
 
