@@ -181,22 +181,13 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         }
     }
 
-    // Match word beginnings, not arbitrary substrings inside unrelated words.
-    fun searchWords(value: String): List<String> =
-        Regex("[\\p{L}\\p{N}]+")
-            .findAll(value.lowercase().replace('ё', 'е'))
-            .map { it.value }
-            .toList()
-
-    val queryWords = searchWords(search)
+    // Substring search in model and dedicated searchable alias only.
+    val normalizedSearch = search.trim()
     val matches = products.filter { product ->
-        if (queryWords.isEmpty()) false
-        else {
-            val searchableWords = searchWords(
-                listOf(product.model, product.description, product.category, product.subcategory, product.subsubcategory).joinToString(" ")
-            )
-            queryWords.all { query -> searchableWords.any { it.startsWith(query) } }
-        }
+        normalizedSearch.isNotBlank() && (
+            product.model.contains(normalizedSearch, ignoreCase = true) ||
+            product.searchName.contains(normalizedSearch, ignoreCase = true)
+        )
     }.take(12)
 
     fun priceFor(product: CatalogProduct, type: String): String = when (type) {
