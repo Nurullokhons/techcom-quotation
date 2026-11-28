@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
@@ -52,20 +53,21 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
         pageNo++
         page = doc.startPage(PdfDocument.PageInfo.Builder(width, height, pageNo).create())
         canvas = page.canvas
-        if (showHeader) {
-            val left = runCatching { context.assets.open("techcom_logo.png").use { BitmapFactory.decodeStream(it) } }.getOrNull()
-            val right = runCatching { context.assets.open("hikvision_logo.png").use { BitmapFactory.decodeStream(it) } }.getOrNull()
-            if (left != null) canvas.drawBitmap(left, null, Rect(28, 18, 190, 57), Paint(3))
-            else canvas.drawText("TECHCOM", 30f, 48f, Paint(bold).apply { textSize = 18f; color = android.graphics.Color.RED })
-            if (right != null) canvas.drawBitmap(right, null, Rect(410, 22, 567, 55), Paint(3))
-            else canvas.drawText("HIKVISION", 420f, 48f, Paint(bold).apply { textSize = 14f; color = android.graphics.Color.RED })
-            val center = Paint(bold).apply { textSize = 6.7f; textAlign = Paint.Align.CENTER }
-            canvas.drawText("г. Худжанд, ул. Исмаила Сомони 16", 300f, 20f, center)
-            canvas.drawText("г. Душанбе, ул. Сафармухаммад Аюби 60", 300f, 30f, center)
-            canvas.drawText("г. Худжанд (+992)926447474", 300f, 40f, center)
-            canvas.drawText("г. Душанбе (+992)927447474", 300f, 50f, center)
-            canvas.drawText("email: aliksystem@mail.ru", 300f, 60f, center)
-            canvas.drawLine(margin, 76f, width - margin, 76f, Paint().apply { color = android.graphics.Color.LTGRAY })
+        if (first && showHeader) {
+            val header = runCatching { context.assets.open("quotation_header.png").use { BitmapFactory.decodeStream(it) } }.getOrNull()
+            if (header != null) {
+                val targetWidth = width - margin * 2
+                val targetHeight = targetWidth * header.height / header.width.toFloat()
+                canvas.drawBitmap(header, null, RectF(margin, 8f, width - margin, 8f + targetHeight), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                header.recycle()
+            } else {
+                val center = Paint(bold).apply { textSize = 6.7f; textAlign = Paint.Align.CENTER }
+                canvas.drawText("TECHCOM                         г. Худжанд, ул. Исмаила Сомони 16                         HIKVISION", 297f, 24f, center)
+                canvas.drawText("г. Душанбе, ул. Сафармухаммад Аюби 60", 297f, 34f, center)
+                canvas.drawText("г. Худжанд (+992)926447474   |   г. Душанбе (+992)927447474", 297f, 44f, center)
+                canvas.drawText("email: aliksystem@mail.ru", 297f, 54f, center)
+            }
+            canvas.drawLine(margin, 64f, width - margin, 64f, Paint().apply { color = android.graphics.Color.LTGRAY })
         }
         if (first) {
             val title = Paint(bold).apply { textSize = 15f; textAlign = Paint.Align.CENTER }
@@ -74,8 +76,7 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
             listOf(organization, contact, phone, address).filter { it.isNotBlank() }.forEach { canvas.drawText(it, margin, cy, normal); cy += 10f }
             y = if (showHeader) 155f else 105f
         } else {
-            canvas.drawText("Коммерческое предложение (продолжение)", margin, 35f, bold)
-            y = 55f
+            y = 34f
         }
         canvas.drawRect(margin, y, width - margin, y + 20f, Paint().apply { color = android.graphics.Color.rgb(235, 237, 240) })
         listOf("№", "Фото", "Модель", "Описание", "Ед.", "Кол-во", "Цена", "Сумма").forEachIndexed { i, label -> canvas.drawText(label, x[i] + 2f, y + 13f, bold) }
@@ -91,7 +92,12 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
         canvas.drawText((index + 1).toString(), x[0] + 2f, y + 14f, normal)
         line.imageFile?.takeIf { it.exists() }?.let { file ->
             BitmapFactory.decodeFile(file.absolutePath)?.let { bmp ->
-                canvas.drawBitmap(bmp, null, Rect(x[1].toInt() + 2, y.toInt() + 3, x[2].toInt() - 3, (y + rowHeight - 3).toInt()), Paint(3))
+                val box = RectF(x[1] + 3f, y + 3f, x[2] - 3f, y + rowHeight - 3f)
+                val scale = minOf(box.width() / bmp.width, box.height() / bmp.height)
+                val drawWidth = bmp.width * scale
+                val drawHeight = bmp.height * scale
+                val dest = RectF(box.centerX() - drawWidth / 2f, box.centerY() - drawHeight / 2f, box.centerX() + drawWidth / 2f, box.centerY() + drawHeight / 2f)
+                canvas.drawBitmap(bmp, null, dest, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
                 bmp.recycle()
             }
         }
@@ -124,12 +130,11 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     return file
 }
 
-internal fun shareQuotationPdf(context: Context, file: File) {
+internal fun previewQuotationPdf(context: Context, file: File) {
     val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
-    val send = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
+    val view = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(send, "Отправить коммерческое предложение"))
+    context.startActivity(Intent.createChooser(view, "Просмотреть PDF"))
 }
