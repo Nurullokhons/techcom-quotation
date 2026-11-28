@@ -21,7 +21,7 @@ import java.math.RoundingMode
 internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, organization: String, contact: String, phone: String, address: String, currency: String, exchangeRate: String, taxIncluded: Boolean, showHeader: Boolean): File {
     val width = 595
     val height = 842
-    val margin = 28f
+    val margin = 10f
     val doc = PdfDocument()
     val normal = Paint(3).apply { color = android.graphics.Color.BLACK; textSize = 8f }
     val bold = Paint(normal).apply { typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
@@ -43,7 +43,7 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
         if (line.isNotEmpty()) result.add(line)
         return if (result.isEmpty()) listOf("") else result
     }
-    val x = floatArrayOf(28f, 53f, 105f, 210f, 365f, 405f, 445f, 505f, 567f)
+    val x = floatArrayOf(10f, 29f, 102f, 212f, 351f, 393f, 430f, 494f, 585f)
     var pageNo = 0
     lateinit var page: PdfDocument.Page
     lateinit var canvas: Canvas
@@ -70,23 +70,30 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
             canvas.drawLine(margin, 64f, width - margin, 64f, Paint().apply { color = android.graphics.Color.LTGRAY })
         }
         if (first) {
-            val title = Paint(bold).apply { textSize = 15f; textAlign = Paint.Align.CENTER }
-            canvas.drawText("КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ", 297f, if (showHeader) 105f else 42f, title)
-            var cy = if (showHeader) 125f else 65f
-            listOf(organization, contact, phone, address).filter { it.isNotBlank() }.forEach { canvas.drawText(it, margin, cy, normal); cy += 10f }
-            y = if (showHeader) 155f else 105f
+            val barY = if (showHeader) 76f else 24f
+            canvas.drawRect(margin, barY, width - margin, barY + 10f, Paint().apply { color = android.graphics.Color.LTGRAY })
+            val title = Paint(bold).apply { textSize = 7.5f; textAlign = Paint.Align.CENTER }
+            canvas.drawText("Коммерческое предложение", width / 2f, barY + 7.5f, title)
+            val datePaint = Paint(bold).apply { textSize = 7.5f; textAlign = Paint.Align.RIGHT }
+            canvas.drawText("Дата: " + SimpleDateFormat("dd.MM.yyyy", Locale("ru")).format(Date()), width - margin - 2f, barY - 2f, datePaint)
+            var cy = barY + 22f
+            listOf(organization, contact, phone, address).filter { it.isNotBlank() }.forEach { canvas.drawText(it, margin + 2f, cy, normal); cy += 9f }
+            y = maxOf(if (showHeader) 91f else 39f, cy + 2f)
         } else {
             y = 34f
         }
-        canvas.drawRect(margin, y, width - margin, y + 20f, Paint().apply { color = android.graphics.Color.rgb(235, 237, 240) })
-        listOf("№", "Фото", "Модель", "Описание", "Ед.", "Кол-во", "Цена", "Сумма").forEachIndexed { i, label -> canvas.drawText(label, x[i] + 2f, y + 13f, bold) }
-        y += 20f
+        canvas.drawRect(margin, y, width - margin, y + 14f, Paint().apply { color = android.graphics.Color.LTGRAY })
+        val headerPaint = Paint(bold).apply { textSize = 6.5f; textAlign = Paint.Align.CENTER }
+        listOf("№", "Изображение", "Модель", "Описание", "Един. Изм", "Кол-во", "Цена", "Сумма").forEachIndexed { i, label ->
+            canvas.drawText(label, (x[i] + x[i + 1]) / 2f, y + 9.5f, headerPaint)
+        }
+        y += 14f
     }
     begin(true)
     lines.forEachIndexed { index, line ->
         val models = wrapped(line.model, bold, x[3] - x[2] - 5f)
         val descriptions = wrapped(line.description, small, x[4] - x[3] - 5f)
-        val rowHeight = maxOf(44f, maxOf(models.size, descriptions.size) * 9f + 10f)
+        val rowHeight = maxOf(44f, maxOf(models.size, descriptions.size) * 8f + 8f)
         if (y + rowHeight > height - 115f) { doc.finishPage(page); begin(false) }
         canvas.drawLine(margin, y + rowHeight, width - margin, y + rowHeight, Paint().apply { color = android.graphics.Color.LTGRAY })
         canvas.drawText((index + 1).toString(), x[0] + 2f, y + 14f, normal)
