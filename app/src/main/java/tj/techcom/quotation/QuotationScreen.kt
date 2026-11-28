@@ -255,7 +255,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Позиций: ${lines.size}", style = MaterialTheme.typography.titleMedium)
                         Text(
@@ -264,6 +264,17 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                             fontWeight = FontWeight.Bold
                         )
                     }
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            if (lines.isEmpty()) pdfMessage = "Добавьте хотя бы одну позицию."
+                            else if (currency == "TJS" && (exchangeRate.toBigDecimalOrNull()?.compareTo(BigDecimal.ZERO) ?: -1) <= 0) pdfMessage = "Укажите корректный курс валюты."
+                            else runCatching {
+                                val pdf = createQuotationPdf(context, lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, exchangeRate, taxIncluded, showHeader)
+                                shareQuotationPdf(context, pdf)
+                            }.onFailure { pdfMessage = "Не удалось создать PDF: " + it.message }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Сформировать PDF и отправить") }
                 }
             }
         }
@@ -400,7 +411,11 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         }
     }
 
-    if (pdfMessage != null) {\n        AlertDialog(onDismissRequest = { pdfMessage = null }, title = { Text("Коммерческое предложение") }, text = { Text(pdfMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { pdfMessage = null }) { Text("OK") } })\n    }\n\n    if (showDetailsDialog) {
+    if (pdfMessage != null) {\n        AlertDialog(onDismissRequest = { pdfMessage = null }, title = { Text("Коммерческое предложение") }, text = { Text(pdfMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { pdfMessage = null }) { Text("OK") } })\n    }\n\n    if (pdfMessage != null) {
+        AlertDialog(onDismissRequest = { pdfMessage = null }, title = { Text("Коммерческое предложение") }, text = { Text(pdfMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { pdfMessage = null }) { Text("OK") } })
+    }
+
+    if (showDetailsDialog) {
         AlertDialog(
             onDismissRequest = { showDetailsDialog = false },
             title = { Text("Данные клиента и параметры КП") },
