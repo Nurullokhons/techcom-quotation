@@ -427,6 +427,7 @@ internal fun NewQuotationScreen(context: Context, initialQuotationJson: String? 
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Row(modifier = Modifier.weight(1f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                     IconButton(
+                                        onClick = {},
                                         modifier = Modifier.pointerInput(line.id) {
                                             detectDragGesturesAfterLongPress(
                                                 onDragStart = {
