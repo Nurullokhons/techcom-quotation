@@ -73,6 +73,7 @@ private data class HomeSection(
 @Composable
 private fun TechcomApp() {
     var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
+    var quotationToEdit by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     BackHandler(enabled = currentScreen != AppScreen.HOME) {
@@ -83,12 +84,23 @@ private fun TechcomApp() {
         AppScreen.HOME -> HomeScreen(onOpen = { currentScreen = it })
         AppScreen.NEW_QUOTATION -> NewQuotationScreen(
             context = context,
-            onBack = { currentScreen = AppScreen.HOME }
+            initialQuotationJson = quotationToEdit,
+            onBack = {
+                quotationToEdit = null
+                currentScreen = AppScreen.HOME
+            }
         )
-        AppScreen.HISTORY -> PlaceholderScreen(
-            title = "История КП",
-            description = "Здесь будут храниться созданные коммерческие предложения. Можно будет открыть и повторно использовать любое из них.",
-            onBack = { currentScreen = AppScreen.HOME }
+        AppScreen.HISTORY -> QuotationHistoryScreen(
+            context = context,
+            onBack = { currentScreen = AppScreen.HOME },
+            onOpen = { saved ->
+                quotationToEdit = saved
+                currentScreen = AppScreen.NEW_QUOTATION
+            },
+            onCopy = { copy ->
+                quotationToEdit = copy
+                currentScreen = AppScreen.NEW_QUOTATION
+            }
         )
         AppScreen.CATALOG -> CatalogScreen(
             context = context,
