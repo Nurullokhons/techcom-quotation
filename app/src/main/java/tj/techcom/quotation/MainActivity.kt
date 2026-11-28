@@ -44,15 +44,43 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+
+private val TechcomRed = Color(0xFFCE1118)
+private val TechcomGray = Color(0xFF716F72)
+private val TechcomWhite = Color(0xFFFFFFFF)
+private val TechcomLightGray = Color(0xFFF3F3F3)
+
+private val TechcomColorScheme = lightColorScheme(
+    primary = TechcomRed,
+    onPrimary = TechcomWhite,
+    primaryContainer = TechcomRed,
+    onPrimaryContainer = TechcomWhite,
+    secondary = TechcomGray,
+    onSecondary = TechcomWhite,
+    secondaryContainer = TechcomLightGray,
+    onSecondaryContainer = TechcomGray,
+    background = TechcomWhite,
+    onBackground = TechcomGray,
+    surface = TechcomWhite,
+    onSurface = TechcomGray,
+    surfaceVariant = TechcomLightGray,
+    onSurfaceVariant = TechcomGray,
+    outline = TechcomGray
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+            MaterialTheme(colorScheme = TechcomColorScheme) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = TechcomColorScheme.background
+                ) {
                     TechcomApp()
                 }
             }
