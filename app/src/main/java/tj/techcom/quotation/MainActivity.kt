@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
@@ -158,7 +161,12 @@ private fun HomeScreen(onOpen: (AppScreen) -> Unit) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("КП-Techcom", style = MaterialTheme.typography.titleLarge)
+                        Image(
+                            painter = painterResource(id = R.drawable.techcom_logo_webp),
+                            contentDescription = "TECHCOM",
+                            modifier = Modifier.height(26.dp).width(132.dp),
+                            contentScale = ContentScale.Fit
+                        )
                         Text(
                             "Коммерческие предложения",
                             style = MaterialTheme.typography.bodySmall,
