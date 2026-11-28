@@ -24,6 +24,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -102,6 +104,8 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
     var clientPhone by remember { mutableStateOf("") }
     var clientAddress by remember { mutableStateOf("") }
     var currency by remember { mutableStateOf("USD") }
+    var priceType by remember { mutableStateOf("Монтажник") }
+    var priceTypeMenuExpanded by remember { mutableStateOf(false) }
     var exchangeRate by remember { mutableStateOf("") }
     var taxIncluded by remember { mutableStateOf(false) }
     var draftRestored by remember { mutableStateOf(false) }
@@ -123,6 +127,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                 clientPhone = root.optString("clientPhone")
                 clientAddress = root.optString("clientAddress")
                 currency = root.optString("currency", "USD").takeIf { it == "TJS" } ?: "USD"
+                priceType = root.optString("priceType", "Монтажник").takeIf { it in listOf("Дилер", "Монтажник", "Розничный") } ?: "Монтажник"
                 exchangeRate = root.optString("exchangeRate")
                 taxIncluded = root.optBoolean("taxIncluded", false)
                 val savedLines = root.optJSONArray("lines") ?: JSONArray()
@@ -148,7 +153,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         draftRestored = true
     }
 
-    LaunchedEffect(lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, exchangeRate, taxIncluded, draftRestored) {
+    LaunchedEffect(lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, priceType, exchangeRate, taxIncluded, draftRestored) {
         if (draftRestored) {
             val root = JSONObject()
             root.put("clientOrganization", clientOrganization)
@@ -156,6 +161,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
             root.put("clientPhone", clientPhone)
             root.put("clientAddress", clientAddress)
             root.put("currency", currency)
+            root.put("priceType", priceType)
             root.put("exchangeRate", exchangeRate)
             root.put("taxIncluded", taxIncluded)
             val savedLines = JSONArray()
@@ -182,6 +188,21 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
             .any { it.lowercase().replace('ё', 'е').contains(normalizedSearch) }
     }.take(12)
 
+    fun priceFor(product: CatalogProduct, type: String): String = when (type) {
+        "Дилер" -> product.dealerPriceUsd.orEmpty()
+        "Розничный" -> product.retailPriceUsd.orEmpty()
+        else -> product.installerPriceUsd.orEmpty()
+    }
+
+    fun changePriceType(type: String) {
+        priceType = type
+        lines.indices.forEach { index ->
+            val line = lines[index]
+            val product = products.firstOrNull { it.id == line.id }
+            if (product != null) lines[index] = line.copy(price = priceFor(product, type))
+        }
+    }
+
     fun addProduct(product: CatalogProduct) {
         val existing = lines.indexOfFirst { it.id == product.id }
         if (existing >= 0) {
@@ -195,7 +216,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                     description = product.description,
                     imageFile = product.imageFile,
                     quantity = 1,
-                    price = product.installerPriceUsd.orEmpty()
+                    price = priceFor(product, priceType)
                 )
             )
         }
@@ -390,6 +411,26 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                     OutlinedTextField(clientContact, { clientContact = it }, label = { Text("Контактное лицо") }, singleLine = true)
                     OutlinedTextField(clientPhone, { clientPhone = it }, label = { Text("Телефон") }, singleLine = true)
                     OutlinedTextField(clientAddress, { clientAddress = it }, label = { Text("Адрес") }, singleLine = true)
+                    Text("Тип цены каталога", fontWeight = FontWeight.SemiBold)
+                    androidx.compose.foundation.layout.Box {
+                        TextButton(onClick = { priceTypeMenuExpanded = true }) {
+                            Text("$priceType  ▾")
+                        }
+                        DropdownMenu(
+                            expanded = priceTypeMenuExpanded,
+                            onDismissRequest = { priceTypeMenuExpanded = false }
+                        ) {
+                            listOf("Дилер", "Монтажник", "Розничный").forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type) },
+                                    onClick = {
+                                        changePriceType(type)
+                                        priceTypeMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                     Text("Валюта коммерческого предложения", fontWeight = FontWeight.SemiBold)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { currency = "USD" }) { Text(if (currency == "USD") "✓ USD" else "USD") }
