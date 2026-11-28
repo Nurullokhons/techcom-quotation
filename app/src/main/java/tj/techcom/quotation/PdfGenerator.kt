@@ -23,9 +23,9 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     val height = 842
     val margin = 10f
     val doc = PdfDocument()
-    val normal = Paint(3).apply { color = android.graphics.Color.BLACK; textSize = 8f }
-    val bold = Paint(normal).apply { typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
-    val small = Paint(normal).apply { textSize = 7f; color = android.graphics.Color.DKGRAY }
+    val normal = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.BLACK; textSize = 8.5f }
+    val bold = Paint(normal).apply { typeface = Typeface.create("verdana", Typeface.BOLD); textSize = 10f }
+    val small = Paint(normal).apply { textSize = 7f; color = android.graphics.Color.BLACK }
     val rate = exchangeRate.toBigDecimalOrNull() ?: BigDecimal.ONE
     fun amount(value: String): String {
         val v = value.toBigDecimalOrNull() ?: BigDecimal.ZERO
@@ -91,12 +91,12 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     }
     begin(true)
     lines.forEachIndexed { index, line ->
-        val models = wrapped(line.model, bold, x[3] - x[2] - 5f)
-        val descriptions = wrapped(line.description, small, x[4] - x[3] - 5f)
-        val rowHeight = maxOf(44f, maxOf(models.size, descriptions.size) * 8f + 8f)
+        val models = wrapped(line.model, bold, x[3] - x[2] - 6f).take(7)
+        val descriptions = wrapped(line.description, small, x[4] - x[3] - 6f).take(7)
+        val rowHeight = 72f
         if (y + rowHeight > height - 115f) { doc.finishPage(page); begin(false) }
         canvas.drawLine(margin, y + rowHeight, width - margin, y + rowHeight, Paint().apply { color = android.graphics.Color.LTGRAY })
-        canvas.drawText((index + 1).toString(), x[0] + 2f, y + 14f, normal)
+        canvas.drawText((index + 1).toString(), (x[0] + x[1]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 10f })
         line.imageFile?.takeIf { it.exists() }?.let { file ->
             BitmapFactory.decodeFile(file.absolutePath)?.let { bmp ->
                 val box = RectF(x[1] + 3f, y + 3f, x[2] - 3f, y + rowHeight - 3f)
@@ -110,17 +110,17 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
         }
         models.forEachIndexed { n, s -> canvas.drawText(s, x[2] + 2f, y + 13f + n * 9f, bold) }
         descriptions.forEachIndexed { n, s -> canvas.drawText(s, x[3] + 2f, y + 13f + n * 9f, small) }
-        canvas.drawText(line.unit.take(6), x[4] + 2f, y + 14f, normal)
-        canvas.drawText(line.quantity.toString(), x[5] + 2f, y + 14f, normal)
-        canvas.drawText(amount(line.price), x[6] + 2f, y + 14f, normal)
+        canvas.drawText(line.unit.take(8), (x[4] + x[5]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 10f })
+        canvas.drawText(line.quantity.toString(), (x[5] + x[6]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 10f })
+        canvas.drawText(amount(line.price) + " " + if (currency == "TJS") "смн" else "USD", (x[6] + x[7]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 9f })
         val sum = (line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(line.quantity))
         total = total.add(sum)
-        canvas.drawText(amount(sum.toPlainString()), x[7] + 2f, y + 14f, normal)
+        canvas.drawText(amount(sum.toPlainString()) + " " + if (currency == "TJS") "смн" else "USD", (x[7] + x[8]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 9f })
         y += rowHeight
     }
     if (y > height - 110f) { doc.finishPage(page); begin(false) }
     y += 14f
-    canvas.drawText("ИТОГО ПО СМЕТЕ: " + amount(total.toPlainString()) + " " + currency, margin, y, Paint(bold).apply { textSize = 11f })
+    canvas.drawText("ИТОГО ПО СМЕТЕ: " + amount(total.toPlainString()) + " " + (if (currency == "TJS") "смн" else "USD"), margin, y, Paint(bold).apply { textSize = 11f; textAlign = Paint.Align.LEFT })
     y += 22f
     canvas.drawText("Цены указаны в " + if (currency == "TJS") "сомони" else "долларах США", margin, y, normal)
     y += 12f
