@@ -181,11 +181,22 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         }
     }
 
-    val normalizedSearch = search.trim().lowercase().replace('ё', 'е')
+    // Match word beginnings, not arbitrary substrings inside unrelated words.
+    fun searchWords(value: String): List<String> =
+        Regex("[\\p{L}\\p{N}]+")
+            .findAll(value.lowercase().replace('ё', 'е'))
+            .map { it.value }
+            .toList()
+
+    val queryWords = searchWords(search)
     val matches = products.filter { product ->
-        if (normalizedSearch.isBlank()) false
-        else listOf(product.model, product.description, product.category, product.subcategory, product.subsubcategory)
-            .any { it.lowercase().replace('ё', 'е').contains(normalizedSearch) }
+        if (queryWords.isEmpty()) false
+        else {
+            val searchableWords = searchWords(
+                listOf(product.model, product.description, product.category, product.subcategory, product.subsubcategory).joinToString(" ")
+            )
+            queryWords.all { query -> searchableWords.any { it.startsWith(query) } }
+        }
     }.take(12)
 
     fun priceFor(product: CatalogProduct, type: String): String = when (type) {
@@ -311,10 +322,6 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                                 ) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         Text(product.model, fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "Монтажник: " + (product.installerPriceUsd?.let { displayPrice(it, currency, exchangeRate) + " " + currencyLabel } ?: "цена не указана"),
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
                                     }
                                 }
                             }
