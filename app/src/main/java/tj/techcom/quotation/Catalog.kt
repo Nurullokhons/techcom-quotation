@@ -48,6 +48,7 @@ import java.util.zip.ZipInputStream
 internal data class CatalogProduct(
     val id: String,
     val model: String,
+    val searchName: String,
     val description: String,
     val unit: String,
     val dealerPriceUsd: String?,
@@ -101,6 +102,7 @@ internal suspend fun loadCatalog(context: Context): CatalogLoadResult = withCont
             products += CatalogProduct(
                 id = item.optString("id"),
                 model = item.optString("model"),
+                searchName = item.optString("searchName"),
                 description = item.optString("description"),
                 unit = item.optString("unit"),
                 dealerPriceUsd = item.optString("dealerPriceUsd").takeIf { it.isNotBlank() && it != "null" },
@@ -145,9 +147,10 @@ internal fun CatalogScreen(context: Context, onBack: () -> Unit) {
         .sorted()
 
     val filtered = products.filter { product ->
-        val matchesSearch = search.isBlank() ||
-            product.model.contains(search, ignoreCase = true) ||
-            product.description.contains(search, ignoreCase = true)
+        val query = search.trim()
+        val matchesSearch = query.isBlank() ||
+            product.model.contains(query, ignoreCase = true) ||
+            product.searchName.contains(query, ignoreCase = true)
         val matchesCategory = selectedCategory == "Все" || product.category == selectedCategory
         val matchesSubcategory = selectedSubcategory == "Все" || product.subcategory == selectedSubcategory
         matchesSearch && matchesCategory && matchesSubcategory
@@ -169,7 +172,7 @@ internal fun CatalogScreen(context: Context, onBack: () -> Unit) {
                 value = search,
                 onValueChange = { search = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Поиск по модели или описанию") },
+                label = { Text("Поиск по модели или поисковому названию") },
                 singleLine = true
             )
 
