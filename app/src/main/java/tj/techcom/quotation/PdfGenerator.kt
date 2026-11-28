@@ -94,7 +94,15 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
             val datePaint = Paint(bold).apply { textSize = 7.5f; textAlign = Paint.Align.RIGHT }
             canvas.drawText("Дата: " + SimpleDateFormat("dd.MM.yyyy", Locale("ru")).format(Date()), width - margin - 2f, barY - 2f, datePaint)
             var cy = barY + 22f
-            listOf(organization, contact, phone, address).filter { it.isNotBlank() }.forEach { canvas.drawText(it, margin + 2f, cy, normal); cy += 9f }
+            listOf(
+                "Организация:" to organization,
+                "Контактное лицо:" to contact,
+                "Телефон:" to phone,
+                "Адрес:" to address
+            ).filter { it.second.isNotBlank() }.forEach { (label, value) ->
+                canvas.drawText("$label $value", margin + 2f, cy, normal)
+                cy += 9f
+            }
             y = maxOf(if (showHeader) 91f else 39f, cy + 2f)
         } else {
             y = 34f
@@ -140,7 +148,16 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     }
     if (y > height - 110f) { doc.finishPage(page); begin(false) }
     y += 14f
-    canvas.drawText("ИТОГО ПО СМЕТЕ: " + amount(total.toPlainString()) + " " + (if (currency == "TJS") "смн" else "USD"), margin, y, Paint(bold).apply { textSize = 11f; textAlign = Paint.Align.LEFT })
+    val totalPaint = Paint(bold).apply {
+        textSize = 11f
+        textAlign = Paint.Align.LEFT
+    }
+    canvas.drawText(
+        "ИТОГО ПО СМЕТЕ: " + amount(total.toPlainString()) + " " + (if (currency == "TJS") "смн" else "USD"),
+        margin + 2f,
+        y,
+        totalPaint
+    )
     y += 22f
     canvas.drawText("* Цены указаны в " + if (currency == "TJS") "Сомони" else "долларах США", margin, y, normal)
     y += 12f
