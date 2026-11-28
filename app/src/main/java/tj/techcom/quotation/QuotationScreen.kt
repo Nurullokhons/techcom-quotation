@@ -11,6 +11,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -40,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -113,6 +121,9 @@ internal fun NewQuotationScreen(context: Context, initialQuotationJson: String? 
     var draftRestored by remember { mutableStateOf(false) }
     var quoteId by remember { mutableStateOf("") }
     val lines = remember { mutableStateListOf<QuotationLine>() }
+    val itemBounds = remember { mutableStateMapOf<String, Pair<Float, Float>>() }
+    var draggingLineId by remember { mutableStateOf<String?>(null) }
+    var dragOffsetY by remember { mutableStateOf(0f) }
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(Unit) {
@@ -399,12 +410,71 @@ internal fun NewQuotationScreen(context: Context, initialQuotationJson: String? 
                 Text("Оборудование в предложении", style = MaterialTheme.typography.titleMedium)
                 lines.toList().forEach { line ->
                     val index = lines.indexOfFirst { it.id == line.id }
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                val top = coordinates.positionInRoot().y
+                                itemBounds[line.id] = top to (top + coordinates.size.height)
+                            }
+                            .graphicsLayer {
+                                if (draggingLineId == line.id) {
+                                    translationY = dragOffsetY
+                                    shadowElevation = 12.dp.toPx()
+                                }
+                            }
+                    ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(line.model, fontWeight = FontWeight.SemiBold)
-                                    if (line.unit.isNotBlank()) Text("Ед. изм.: ${line.unit}", style = MaterialTheme.typography.bodySmall)
+                                Row(modifier = Modifier.weight(1f), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                    IconButton(
+                                        modifier = Modifier.pointerInput(line.id) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = {
+                                                    draggingLineId = line.id
+                                                    dragOffsetY = 0f
+                                                },
+                                                onDragEnd = {
+                                                    draggingLineId = null
+                                                    dragOffsetY = 0f
+                                                },
+                                                onDragCancel = {
+                                                    draggingLineId = null
+                                                    dragOffsetY = 0f
+                                                }
+                                            ) { change, dragAmount ->
+                                                change.consume()
+                                                if (draggingLineId == line.id) {
+                                                    dragOffsetY += dragAmount.y
+                                                    val bounds = itemBounds[line.id]
+                                                    if (bounds != null) {
+                                                        val draggedCenter = (bounds.first + bounds.second) / 2f + dragOffsetY
+                                                        val target = lines.firstOrNull { other ->
+                                                            other.id != line.id && itemBounds[other.id]?.let { targetBounds ->
+                                                                draggedCenter >= targetBounds.first &&
+                                                                    draggedCenter <= targetBounds.second
+                                                            } == true
+                                                        }
+                                                        if (target != null) {
+                                                            val moving = lines.firstOrNull { it.id == line.id }
+                                                            if (moving != null) {
+                                                                lines.remove(moving)
+                                                                val targetIndex = lines.indexOfFirst { it.id == target.id }
+                                                                if (targetIndex >= 0) lines.add(targetIndex, moving)
+                                                                dragOffsetY = 0f
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.DragHandle, contentDescription = "Перетащить позицию")
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(line.model, fontWeight = FontWeight.SemiBold)
+                                        if (line.unit.isNotBlank()) Text("Ед. изм.: ${line.unit}", style = MaterialTheme.typography.bodySmall)
+                                    }
                                 }
                                 IconButton(onClick = { lines.remove(line) }) {
                                     Icon(Icons.Default.Delete, contentDescription = "Удалить")
