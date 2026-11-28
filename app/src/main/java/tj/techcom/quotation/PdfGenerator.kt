@@ -47,6 +47,14 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     var pageNo = 0
     lateinit var page: PdfDocument.Page
     lateinit var canvas: Canvas
+    val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 0.8f }
+    fun centered(text: String, left: Float, right: Float, top: Float, bottom: Float, paint: Paint) {
+        val metrics = paint.fontMetrics
+        val baseline = (top + bottom - metrics.ascent - metrics.descent) / 2f
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText(text, (left + right) / 2f, baseline, paint)
+        paint.textAlign = Paint.Align.LEFT
+    }
     var y = 0f
     var total = BigDecimal.ZERO
     fun begin(first: Boolean) {
@@ -95,8 +103,9 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
         val descriptions = wrapped(line.description, small, x[4] - x[3] - 6f).take(7)
         val rowHeight = 72f
         if (y + rowHeight > height - 115f) { doc.finishPage(page); begin(false) }
-        canvas.drawLine(margin, y + rowHeight, width - margin, y + rowHeight, Paint().apply { color = android.graphics.Color.LTGRAY })
-        canvas.drawText((index + 1).toString(), (x[0] + x[1]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 10f })
+        canvas.drawRect(margin, y, width - margin, y + rowHeight, gridPaint)
+        for (column in 1 until x.size - 1) canvas.drawLine(x[column], y, x[column], y + rowHeight, gridPaint)
+        centered((index + 1).toString(), x[0], x[1], y, y + rowHeight, bold)
         line.imageFile?.takeIf { it.exists() }?.let { file ->
             BitmapFactory.decodeFile(file.absolutePath)?.let { bmp ->
                 val box = RectF(x[1] + 3f, y + 3f, x[2] - 3f, y + rowHeight - 3f)
@@ -110,12 +119,12 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
         }
         models.forEachIndexed { n, s -> canvas.drawText(s, x[2] + 2f, y + 13f + n * 9f, bold) }
         descriptions.forEachIndexed { n, s -> canvas.drawText(s, x[3] + 2f, y + 13f + n * 9f, small) }
-        canvas.drawText(line.unit.take(8), (x[4] + x[5]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 10f })
-        canvas.drawText(line.quantity.toString(), (x[5] + x[6]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 10f })
-        canvas.drawText(amount(line.price) + " " + if (currency == "TJS") "смн" else "USD", (x[6] + x[7]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 9f })
+        centered(line.unit.take(8), x[4], x[5], y, y + rowHeight, bold)
+        centered(line.quantity.toString(), x[5], x[6], y, y + rowHeight, bold)
+        centered(amount(line.price) + " " + if (currency == "TJS") "смн" else "USD", x[6], x[7], y, y + rowHeight, Paint(bold).apply { textSize = 9f })
         val sum = (line.price.toBigDecimalOrNull() ?: BigDecimal.ZERO).multiply(BigDecimal(line.quantity))
         total = total.add(sum)
-        canvas.drawText(amount(sum.toPlainString()) + " " + if (currency == "TJS") "смн" else "USD", (x[7] + x[8]) / 2f, y + rowHeight / 2f, Paint(bold).apply { textAlign = Paint.Align.CENTER; textSize = 9f })
+        centered(amount(sum.toPlainString()) + " " + if (currency == "TJS") "смн" else "USD", x[7], x[8], y, y + rowHeight, Paint(bold).apply { textSize = 9f })
         y += rowHeight
     }
     if (y > height - 110f) { doc.finishPage(page); begin(false) }
