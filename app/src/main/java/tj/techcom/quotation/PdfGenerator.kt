@@ -131,13 +131,15 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     y += 14f
     canvas.drawText("ИТОГО ПО СМЕТЕ: " + amount(total.toPlainString()) + " " + (if (currency == "TJS") "смн" else "USD"), margin, y, Paint(bold).apply { textSize = 11f; textAlign = Paint.Align.LEFT })
     y += 22f
-    canvas.drawText("Цены указаны в " + if (currency == "TJS") "сомони" else "долларах США", margin, y, normal)
+    canvas.drawText("* Цены указаны в " + if (currency == "TJS") "Сомони" else "долларах США", margin, y, normal)
     y += 12f
-    canvas.drawText(if (taxIncluded) "Цены указаны с учётом налогов" else "Цены указаны без учёта налогов", margin, y, normal)
+    canvas.drawText(if (taxIncluded) "* Цены указаны с учётом налогов" else "* Цены указаны без учёта налогов", margin, y, normal)
     y += 12f
-    canvas.drawText("Данное коммерческое предложение действует 14 дней с даты выдачи", margin, y, normal)
+    canvas.drawText("* Данное коммерческое предложение действует 14 дней с даты выдачи.", margin, y, normal)
     y += 12f
-    canvas.drawText("Гарантия на оборудование 12 месяцев", margin, y, normal)
+    canvas.drawText("* Гарантия на оборудование 12 месяцев.", margin, y, normal)
+    y += 12f
+    canvas.drawText("* Расходные материалы считаются по факту.", margin, y, normal)
     doc.finishPage(page)
     val dir = File(context.getExternalFilesDir(null), "quotations").apply { mkdirs() }
     val file = File(dir, "KP_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".pdf")
