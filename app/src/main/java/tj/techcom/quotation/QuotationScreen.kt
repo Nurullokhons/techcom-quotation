@@ -270,11 +270,11 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                             else if (currency == "TJS" && (exchangeRate.toBigDecimalOrNull()?.compareTo(BigDecimal.ZERO) ?: -1) <= 0) pdfMessage = "Укажите корректный курс валюты."
                             else runCatching {
                                 val pdf = createQuotationPdf(context, lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, exchangeRate, taxIncluded, showHeader)
-                                shareQuotationPdf(context, pdf)
+                                previewQuotationPdf(context, pdf)
                             }.onFailure { pdfMessage = "Не удалось создать PDF: " + it.message }
                         },
                         modifier = Modifier.fillMaxWidth()
-                    ) { Text("Сформировать PDF и отправить") }
+                    ) { Text("Сохранить и просмотреть PDF") }
                 }
             }
         }
