@@ -58,7 +58,7 @@ import java.io.File
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-private data class QuotationLine(
+internal data class QuotationLine(
     val id: String,
     val model: String,
     val unit: String,
@@ -108,6 +108,8 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
     var priceTypeMenuExpanded by remember { mutableStateOf(false) }
     var exchangeRate by remember { mutableStateOf("") }
     var taxIncluded by remember { mutableStateOf(false) }
+    var showHeader by remember { mutableStateOf(true) }
+    var pdfMessage by remember { mutableStateOf<String?>(null) }
     var draftRestored by remember { mutableStateOf(false) }
     val lines = remember { mutableStateListOf<QuotationLine>() }
     val focusManager = LocalFocusManager.current
@@ -130,6 +132,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                 priceType = root.optString("priceType", "Монтажник").takeIf { it in listOf("Дилер", "Монтажник", "Розничный") } ?: "Монтажник"
                 exchangeRate = root.optString("exchangeRate")
                 taxIncluded = root.optBoolean("taxIncluded", false)
+                showHeader = root.optBoolean("showHeader", true)
                 val savedLines = root.optJSONArray("lines") ?: JSONArray()
                 for (i in 0 until savedLines.length()) {
                     val item = savedLines.getJSONObject(i)
@@ -153,7 +156,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         draftRestored = true
     }
 
-    LaunchedEffect(lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, priceType, exchangeRate, taxIncluded, draftRestored) {
+    LaunchedEffect(lines.toList(), clientOrganization, clientContact, clientPhone, clientAddress, currency, priceType, exchangeRate, taxIncluded, showHeader, draftRestored) {
         if (draftRestored) {
             val root = JSONObject()
             root.put("clientOrganization", clientOrganization)
@@ -164,6 +167,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
             root.put("priceType", priceType)
             root.put("exchangeRate", exchangeRate)
             root.put("taxIncluded", taxIncluded)
+            root.put("showHeader", showHeader)
             val savedLines = JSONArray()
             lines.forEach { line ->
                 savedLines.put(JSONObject().apply {
@@ -396,7 +400,7 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
         }
     }
 
-    if (showDetailsDialog) {
+    if (pdfMessage != null) {\n        AlertDialog(onDismissRequest = { pdfMessage = null }, title = { Text("Коммерческое предложение") }, text = { Text(pdfMessage.orEmpty()) }, confirmButton = { TextButton(onClick = { pdfMessage = null }) { Text("OK") } })\n    }\n\n    if (showDetailsDialog) {
         AlertDialog(
             onDismissRequest = { showDetailsDialog = false },
             title = { Text("Данные клиента и параметры КП") },
@@ -442,6 +446,10 @@ internal fun NewQuotationScreen(context: Context, onBack: () -> Unit) {
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
+                    }
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Checkbox(checked = showHeader, onCheckedChange = { showHeader = it })
+                        Text("С шапкой (TECHCOM, контакты и Hikvision)")
                     }
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Checkbox(checked = taxIncluded, onCheckedChange = { taxIncluded = it })
