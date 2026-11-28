@@ -24,7 +24,15 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     val margin = 10f
     val doc = PdfDocument()
     val normal = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.BLACK; textSize = 8.5f }
-    val boldTypeface = runCatching { context.assets.open("verdana_bold.ttf").use { Typeface.createFromFile(it.fd) } }.getOrElse { Typeface.create("sans-serif", Typeface.BOLD) }
+    val boldTypeface = runCatching<Typeface> {
+        val fontFile = File(context.cacheDir, "verdana_bold.ttf")
+        if (!fontFile.exists()) {
+            context.assets.open("verdana_bold.ttf").use { input ->
+                fontFile.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+        Typeface.createFromFile(fontFile)
+    }.getOrElse { Typeface.create("sans-serif", Typeface.BOLD) }
     val bold = Paint(normal).apply { typeface = boldTypeface; textSize = 10f }
     val small = Paint(normal).apply { textSize = 7f; color = android.graphics.Color.BLACK }
     val rate = exchangeRate.toBigDecimalOrNull() ?: BigDecimal.ONE
