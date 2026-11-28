@@ -44,8 +44,8 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     }
     val x = floatArrayOf(28f, 53f, 105f, 210f, 365f, 405f, 445f, 505f, 567f)
     var pageNo = 0
-    var page: PdfDocument.Page
-    var canvas: Canvas
+    lateinit var page: PdfDocument.Page
+    lateinit var canvas: Canvas
     var y = 0f
     var total = BigDecimal.ZERO
     fun begin(first: Boolean) {
