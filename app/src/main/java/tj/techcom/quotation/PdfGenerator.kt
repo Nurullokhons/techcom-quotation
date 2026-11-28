@@ -24,7 +24,8 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     val margin = 10f
     val doc = PdfDocument()
     val normal = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.BLACK; textSize = 8.5f }
-    val bold = Paint(normal).apply { typeface = Typeface.create("verdana", Typeface.BOLD); textSize = 10f }
+    val boldTypeface = runCatching { context.assets.open("verdana_bold.ttf").use { Typeface.createFromFile(it.fd) } }.getOrElse { Typeface.create("sans-serif", Typeface.BOLD) }
+    val bold = Paint(normal).apply { typeface = boldTypeface; textSize = 10f }
     val small = Paint(normal).apply { textSize = 7f; color = android.graphics.Color.BLACK }
     val rate = exchangeRate.toBigDecimalOrNull() ?: BigDecimal.ONE
     fun amount(value: String): String {
@@ -91,11 +92,13 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
             y = 34f
         }
         canvas.drawRect(margin, y, width - margin, y + 14f, Paint().apply { color = android.graphics.Color.LTGRAY })
-        val headerPaint = Paint(bold).apply { textSize = 6.5f; textAlign = Paint.Align.CENTER }
+        val headerPaint = Paint(bold).apply { textSize = 7f }
         listOf("№", "Изображение", "Модель", "Описание", "Един. Изм", "Кол-во", "Цена", "Сумма").forEachIndexed { i, label ->
-            canvas.drawText(label, (x[i] + x[i + 1]) / 2f, y + 9.5f, headerPaint)
+            centered(label, x[i], x[i + 1], y, y + 20f, headerPaint)
         }
-        y += 14f
+        canvas.drawRect(margin, y, width - margin, y + 20f, gridPaint)
+        for (column in 1 until x.size - 1) canvas.drawLine(x[column], y, x[column], y + 20f, gridPaint)
+        y += 20f
     }
     begin(true)
     lines.forEachIndexed { index, line ->
