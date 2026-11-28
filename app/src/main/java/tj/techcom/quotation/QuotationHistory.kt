@@ -76,6 +76,7 @@ internal fun duplicateQuotation(source: JSONObject): String {
     }.toString()
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun QuotationHistoryScreen(
     context: Context,
