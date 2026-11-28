@@ -150,11 +150,11 @@ internal fun createQuotationPdf(context: Context, lines: List<QuotationLine>, or
     y += 14f
     val totalPaint = Paint(bold).apply {
         textSize = 11f
-        textAlign = Paint.Align.LEFT
+        textAlign = Paint.Align.RIGHT
     }
     canvas.drawText(
         "ИТОГО ПО СМЕТЕ: " + amount(total.toPlainString()) + " " + (if (currency == "TJS") "смн" else "USD"),
-        margin + 2f,
+        width - margin - 2f,
         y,
         totalPaint
     )
